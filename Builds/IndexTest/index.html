@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Кнопка по центру</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <button onclick="Call()">Вызов апи</button>
+    <button onclick="Init()">инит</button>
+    <button onclick="Photo()">Try get photo</button>
+    <button onclick="Friends()">Try get photo</button>
+    <script src="https://unpkg.com/@vkid/sdk@<3.0.0/dist-sdk/umd/index.js"></script>
+    <script>
+
+        var identify;
+
+        function Photo() {
+
+            var method = "users.get";
+
+            var params =
+            {
+                user_ids: "170131126", fields: 'photo_max_orig', v: '5.199'
+            };
+
+
+            VK.Api.call(method, params, callback);
+
+            function callback(data) {
+                alert(JSON.stringify(data));
+            }
+        }
+
+
+        function Friends() {
+
+            var method = "friends.get";
+
+            var params =
+            {
+                user_id: "170131126", count: 1, fields: 'nickname,photo_100,sex', v: '5.199'
+            };
+
+
+            VK.Api.call(method, params, callback);
+
+            function callback(data) {
+                alert(JSON.stringify(data));
+            }
+        }
+
+        function Init() {
+            window.vkAsyncInit = function () {
+                VK.init({
+                    apiId: "53149564"
+                });
+            };
+
+            setTimeout(function () {
+                var el = document.createElement("script");
+                el.type = "text/javascript";
+                el.src = "https://vk.com/js/api/openapi.js?169";
+                el.async = true;
+                document.getElementsByTagName('head')[0].appendChild(el);
+            }, 0);
+        }
+
+
+
+        function Call() {
+            var settings = 1 << 2;
+
+            VK.Auth.login(callback, settings);
+
+            function callback(response) {
+                if (response.session) {
+                    identify = response.session.user.id;
+                    alert(JSON.stringify(response.session));
+                }
+                else {
+                    //SendMessage(Utf8_unityObject, Utf8_unityMethod, "error");
+                }
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WalletConnect Пример</title>
+</head>
+<body>
+    <h1>WalletConnect Пример</h1>
+    <button id="connectButton">Подключиться</button>
+
+    <!-- Подключаем WalletConnect через CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@walletconnect/ethereum-provider@2.21/dist/index.umd.min.js"></script>
+
+    <script>
+        async function connectWallet() {
+            try {
+                // Получаем WalletConnectProvider
+                const WalletConnectProvider = window['@walletconnect/ethereum-provider'].EthereumProvider;
+
+                console.log('-----', WalletConnectProvider)
+                if (!WalletConnectProvider) {
+                    throw new Error("WalletConnectProvider не найден.");
+                }
+
+                // const core = new Core({
+                // projectId: '3040808e3c4a19a9897743f7772df475'
+                // })
+
+                // const metadata = {
+                // name: 'MW',
+                // description: 'AppKit Example',
+                // url: 'https://reown.com/appkit', // origin must match your domain & subdomain
+                // icons: ['https://assets.reown.com/reown-profile-pic.png']
+                // }
+
+                // const walletKit = await WalletKit.init({
+                // core, // <- pass the shared 'core' instance
+                // metadata
+                // })
+
+                // Создаем новый провайдер с необходимыми параметрами
+                const provider = await WalletConnectProvider.init({
+                    projectId: "3040808e3c4a19a9897743f7772df475",  // Замените на ваш Project ID из WalletConnect Cloud
+                    chainId: '137',  // Polygon Mainnet
+                    chains: ['137'],
+                    // rpc: {
+                    //     137: "https://rpc.ankr.com/polygon"
+                    // },
+                    showQrModal: true,
+                    qrcodeModalOptions: {
+                        mobileLinks: ["metamask", "trust", "coinbase"]
+                    },
+                    rpcMap: {
+                        '137': 'https://rpc.ankr.com/polygon'
+                    }
+                });
+
+                // Выводим информацию о провайдере
+                console.log("Provider создан:", provider);
+           
+           
+                const resEnable =  await provider.enable();  // Важно: этот метод должен быть вызван для инициализации провайдера
+                
+                console.log('==resEnable==', resEnable)
+                // Проверка состояния провайдера перед включением
+                // if (!provider.connected) {
+                //     // Инициализация и подключение к кошельку
+                //     await provider.enable();  // Важно: этот метод должен быть вызван для инициализации провайдера
+                //     console.log("Провайдер инициализирован");
+                // } else {
+                //     console.log("Провайдер уже подключен");
+                // }
+
+                // Запрашиваем аккаунты
+                // provider.sendAsync({ method: "eth_requestAccounts" }, function name(response) {
+                //     //
+                //     console.log("response:", response);
+                // });
+
+                const accounts = await provider.request({ method: "eth_accounts" });
+                console.log("Подключенные аккаунты:", accounts);
+                alert("Подключены аккаунты: " + accounts.join(", "));
+            } catch (error) {
+                console.error("Ошибка при подключении:", error);
+                // alert("Ошибка подключения: " + error.message);
+            }
+        }
+
+        // Обработчик для кнопки подключения
+        document.getElementById("connectButton").addEventListener("click", connectWallet);
+    </script>
+</body>
+</html>

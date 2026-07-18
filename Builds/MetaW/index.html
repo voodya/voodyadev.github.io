@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Unity Web Player | Metaverse</title>
+    <link rel="shortcut icon" href="TemplateData/favicon.ico">
+    <link rel="stylesheet" href="TemplateData/style.css">
+    <link rel="manifest" href="manifest.webmanifest">
+  </head>
+  <body>
+      <div id="unity-container">
+          <canvas id="unity-canvas" width=960 height=600 tabindex="-1"></canvas>
+          <div id="unity-loading-bar">
+              <div id="unity-logo"></div>
+              <div id="unity-progress-bar-empty">
+                  <div id="unity-progress-bar-full"></div>
+              </div>
+          </div>
+          <div id="unity-warning"> </div>
+      </div>
+          <!-- Подключаем MetaMask SDK -->
+    <script src="https://c0f4f41c-2f55-4863-921b-sdk-docs.github.io/cdn/metamask-sdk.js"></script>
+
+    <!-- Подключаем WalletConnect через CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@walletconnect/ethereum-provider@2.21.1/dist/index.umd.min.js" onerror="console.error('Ошибка загрузки WalletConnect UMD'); document.getElementById('status').textContent = 'Статус: WalletConnect не доступен'; document.getElementById('status').classList.add('error');"></script>
+
+    <!-- Подключаем ethers.js -->
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.14.0/dist/ethers.umd.min.js"></script>
+      <script>
+        var ObjectName = "RHandler";
+        var MethodName = "Result";
+      window.addEventListener("load", () => {
+        if ("serviceWorker" in navigator) {
+          navigator.serviceWorker.register("ServiceWorker.js");
+        }
+      });
+      let provider;
+      let wcProvider;
+      let MMSDK;
+
+      async function withRetries(fn, maxRetries = 3, delay = 1000) 
+      {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) 
+        {
+          try 
+          {
+            return await fn();
+          } 
+          catch (error) 
+          {
+            if (attempt === maxRetries || !error.message.includes('timed out')) 
+            {
+              throw error;
+            }
+            console.warn(`Попытка ${attempt} не удалась: ${error.message}. Повтор через ${delay}мс`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
+      }
+
+      async function connectWallet() 
+      {
+        try 
+        {         
+          await initializeWalletConnect();
+        }
+        catch (error) 
+        {
+          console.error('Ошибка инициализации:', error);
+          return false;
+        }
+        return true;
+      }
+      async function initializeMetaMask() {
+                try {
+                    console.log('Инициализация MetaMask: начата');
+                    MMSDK = new MetaMaskSDK.MetaMaskSDK({
+                        dappMetadata: {
+                            name: 'Polygon DApp',
+                            url: window.location.href,
+                        },
+                        shouldShimWeb3: true,
+                    });
+                    await MMSDK.connect();
+                    provider = MMSDK.getProvider();
+                    if (!provider) {
+                        throw new Error('MetaMask провайдер не инициализирован');
+                    }
+                    console.log('MetaMask: подключение успешно');
+                    return true;
+                } catch (error) {
+                    throw new Error(`MetaMask инициализация не удалась: ${error.message}`);
+                }
+            }
+
+            async function signMessage(string) {
+                try {
+                    const message =  string;
+                    if (!message) {
+                        customUnityMessage("Пустая строка", "error");
+                        return;
+                    }
+
+                    if (!provider) {
+                        customUnityMessage("Кошелек не подключён", "error");
+                        return;
+                    }
+
+                    const accounts = await withRetries(() => provider.request({ method: 'eth_accounts' }));
+                    if (!accounts || accounts.length === 0) {
+                        customUnityMessage("Кошелек не подключён", "error");
+                        return;
+                    }
+
+                    const address = accounts[0];
+                    const messageHex = ethers.hexlify(ethers.toUtf8Bytes(message));
+                    const signature = await withRetries(() => provider.request({
+                        method: 'personal_sign',
+                        params: [messageHex, address],
+                    }));
+                    customUnityMessage(signature, "sign");
+                } catch (error) {
+                    statusDiv.textContent = `Статус: Ошибка подписи - ${error.message}`;
+                    statusDiv.classList.add('error');
+                    console.error('Ошибка подписи:', error);
+                }
+            }
+
+      async function initializeWalletConnect() 
+      {
+        try {
+          //Получаем WalletConnectProvider
+          const WalletConnectProvider = window['@walletconnect/ethereum-provider']?.EthereumProvider;
+          if (!WalletConnectProvider)
+          {
+            throw new Error('WalletConnectProvider не найден.');
+          }
+          console.log('Инициализация WalletConnect: начата');
+          wcProvider = await WalletConnectProvider.init(
+            {
+              projectId: '3040808e3c4a19a9897743f7772df475',
+              chains: [137],
+              optionalChains: [137],
+              showQrModal: true,
+              qrcodeModalOptions: 
+              {
+                mobileLinks: ['metamask', 'trust', 'coinbase'],
+              },
+              rpcMap: 
+              {
+                137: 'https://polygon-rpc.com',
+              },
+              metadata: 
+              {
+                name: 'Polygon DApp',
+                description: 'DApp на Polygon',
+                url: window.location.href,
+                icons: ['https://walletconnect.com/walletconnect-logo.png'],
+              },
+            });
+          console.log('WalletConnect: init завершён, начинаем connect');
+          if (!wcProvider.connected) 
+          {
+            await wcProvider.connect();
+            console.log('WalletConnect: подключение успешно');
+          } 
+          else
+          {
+            console.log('WalletConnect: уже подключён');
+          }
+          provider = wcProvider;
+          return true;
+          } 
+          catch (error) 
+          {
+            throw new Error(`WalletConnect инициализация не удалась: ${error.message}`);
+          }
+      }
+
+      async function connectAndGetBalance() 
+      {
+        try 
+        {
+          if (!provider) 
+          {
+            if (!(await connectWallet())) 
+            {
+              return;
+            }
+          }
+
+          let address;
+          var message;
+          try 
+          {
+            const accounts = await withRetries(() => provider.request({ method: 'eth_requestAccounts' }));
+            address = accounts[0];
+            message += `Подключённый адрес: ${address}\n`;
+            message += `Статус: Подключено через WalletConnect\n`;
+            customUnityMessage(address, "wallet");
+          } 
+          catch (authError) 
+          {
+            message += `Статус: Ошибка подключения - ${authError.message}`;
+            console.log(message);
+
+            customUnityMessage(`Ошибка подключения - ${authError.message}`, "error");
+            return;
+          }
+
+          const ethersProvider = new ethers.BrowserProvider(provider);
+          const network = await withRetries(() => ethersProvider.getNetwork());
+          const polygonChainId = 137;
+
+          if (Number(network.chainId) !== polygonChainId) 
+          {
+            try 
+            {
+              await withRetries(() => provider.request(
+              {
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: `0x${polygonChainId.toString(16)}` }],
+              }));
+              message += 'Статус: Переключено на Polygon';
+            } 
+            catch (switchError) 
+            {
+              if (switchError.code === 4902) 
+              {
+                await withRetries(() => provider.request(
+                {
+                  method: 'wallet_addEthereumChain',
+                  params: [
+                  {
+                    chainId: `0x${polygonChainId.toString(16)}`,
+                    chainName: 'Polygon Mainnet',
+                    nativeCurrency: 
+                    {
+                      name: 'MATIC',
+                      symbol: 'MATIC',
+                      decimals: 18,
+                    },
+                    rpcUrls: ['https://polygon-rpc.com'],
+                    blockExplorerUrls: ['https://polygonscan.com/'],
+                  }],
+                }));
+                message += 'Статус: Сеть Polygon добавлена';
+              }
+              else 
+              {
+                message += 'Статус: Ошибка при переключении сети';
+                console.log(message);
+                customUnityMessage('Ошибка при переключении сети', "error");
+                return;
+              }
+            }
+          }
+
+          const balance = await withRetries(() => ethersProvider.getBalance(address));
+          const balanceInMatic = ethers.formatEther(balance);
+          message += `Баланс: ${balanceInMatic} MATIC`;
+          console.log(message);
+          customUnityMessage(balanceInMatic, "balance");
+        } 
+        catch (error)
+        {
+          message += `Статус: Ошибка - ${error.message}`;
+          console.log(message);
+          //unity.SendMessage(ObjectName, MethodName, message);
+          customUnityMessage(message, "error");
+        }
+      }
+      
+      var container = document.querySelector("#unity-container");
+      var canvas = document.querySelector("#unity-canvas");
+      var loadingBar = document.querySelector("#unity-loading-bar");
+      var progressBarFull = document.querySelector("#unity-progress-bar-full");
+      var warningBanner = document.querySelector("#unity-warning");
+      window.ConnectWallet
+
+      // Shows a temporary message banner/ribbon for a few seconds, or
+      // a permanent error message on top of the canvas if type=='error'.
+      // If type=='warning', a yellow highlight color is used.
+      // Modify or remove this function to customize the visually presented
+      // way that non-critical warnings and error messages are presented to the
+      // user.
+      function unityShowBanner(msg, type) {
+        function updateBannerVisibility() {
+          warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
+        }
+        var div = document.createElement('div');
+        div.innerHTML = msg;
+        warningBanner.appendChild(div);
+        if (type == 'error') div.style = 'background: red; padding: 10px;';
+        else {
+          if (type == 'warning') div.style = 'background: yellow; padding: 10px;';
+          setTimeout(function() {
+            warningBanner.removeChild(div);
+            updateBannerVisibility();
+          }, 5000);
+        }
+        updateBannerVisibility();
+      }
+
+      function customUnityMessage(msg, type)
+      {
+        var composeMsg = {
+          types: type,
+          message: msg,
+        }
+        unity.SendMessage(ObjectName, MethodName, JSON.stringify(composeMsg));
+      }
+
+      var buildUrl = "Build";
+      var loaderUrl = buildUrl + "/MetaW.loader.js";
+      var config = {
+        arguments: [],
+        dataUrl: buildUrl + "/MetaW.data.unityweb",
+        frameworkUrl: buildUrl + "/MetaW.framework.js.unityweb",
+        codeUrl: buildUrl + "/MetaW.wasm.unityweb",
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: "DefaultCompany",
+        productName: "Metaverse",
+        productVersion: "1.0",
+        showBanner: unityShowBanner,
+      };
+
+      // By default Unity keeps WebGL canvas render target size matched with
+      // the DOM size of the canvas element (scaled by window.devicePixelRatio)
+      // Set this to false if you want to decouple this synchronization from
+      // happening inside the engine, and you would instead like to size up
+      // the canvas DOM size and WebGL render target sizes yourself.
+      // config.matchWebGLToCanvasSize = false;
+
+      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        // Mobile device style: fill the whole browser client area with the game canvas:
+        var meta = document.createElement('meta');
+        meta.name = 'viewport';
+        meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
+        document.getElementsByTagName('head')[0].appendChild(meta);
+      }
+
+      loadingBar.style.display = "block";
+      let unity;
+      var script = document.createElement("script");
+      script.src = loaderUrl;
+      script.onload = () => {
+        createUnityInstance(canvas, config, (progress) => {
+          progressBarFull.style.width = 100 * progress + "%";
+        }).then((unityInstance) => {
+          unity = unityInstance;
+          loadingBar.style.display = "none";
+        }).catch((message) => {
+          alert(message);
+        });
+      };
+      document.body.appendChild(script);
+      </script>
+  </body>
+</html>
